@@ -55,3 +55,6 @@ SQL # in name use " or [] around column
 What are the 5 types of annotation?
 The 5 types of annotation that power AI: text, audio, image, video, time-series. Data annotation isn't just about labeling, It's about giving machines the context they need to learn. From text to audio, images to time-series, Each type of annotation plays a crucial role in making AI smarter.27 Aug 2025
 
+
+Cucumber/Gherkin Business rules engine
+commands = "[[\"ls\", \"--debug\"]]"
