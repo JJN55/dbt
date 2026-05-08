@@ -215,6 +215,26 @@ FROM dbo.omlegalentity
 --*/
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+pi.sql
+drop table if exists #t
+create table #t(n int, txt varchar(100), lng int)
+insert into #t(n, txt) values(0, 'zero')
+insert into #t(n, txt) values(1, 'one')
+insert into #t(n, txt) values(2, 'two')
+insert into #t(n, txt) values(3, 'three')
+insert into #t(n, txt) values(4, 'four')
+insert into #t(n, txt) values(5, 'five')
+insert into #t(n, txt) values(6, 'six')
+insert into #t(n, txt) values(7, 'seven')
+insert into #t(n, txt) values(8, 'eight')
+insert into #t(n, txt) values(9, 'nine')
+update #t set lng = len(txt)
+select * from #t
+drop table if exists #t
+
+select pi()
+SELECT ACOS(1/sqrt(2))
+select acos(-1)
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
