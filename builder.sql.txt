@@ -1,0 +1,119 @@
+#SQL file builder
+from pyspark.sql import SparkSession
+import re
+
+def convert_to_underscore(text):
+    """
+    Converts whitespace and special characters in a string to underscores.
+    Args:
+      text: The input string.
+    Returns:
+      The modified string with whitespace and special characters replaced by underscores.
+    """
+    # Replace all non-alphanumeric characters (including whitespace and special characters)
+    # with a single underscore.
+    # The '+' ensures multiple consecutive non-alphanumeric characters are replaced by one underscore.
+    cleaned_text = re.sub(r'[^a-zA-Z0-9_]+', '_', text)
+    return cleaned_text
+
+def source_select(text):
+    """
+    Replaces any character that is NOT:
+    letters (a-z, A-Z)
+    numbers (0-9)
+    underscore (_)
+    With an underscore _.
+    """
+    cleaned_text = re.sub(r'[^a-zA-Z0-9_]+', '_', text)
+    if  (cleaned_text == text):
+        return cleaned_text
+    else:
+        return f"{{{{adapter.quote(\"{text}\")}}}} as {cleaned_text}"
+
+#Add parameters for the table and coding style
+#Coding style Parameters
+prefix = "snap_"
+surrogate_key_suffix = "_key"
+#Formatting parameters
+tab_size = 4
+tab_string = "".rjust(tab_size)
+newline = "\n"
+#### MUST CHANGE PARAMETERS BELOW FOR NEW TABLE ####
+bronze_table_name = "assetclassrep".lower()
+column_unique_key = "'legalentityid'"
+partition_by_1 = 'name'
+partition_by_2 = "legalentityid"
+order_by = "modifieddatetime"
+#### MUST CHANGE PARAMETERS ABOVE FOR NEW TABLE ####
+
+#FILE NAME:
+print(f"{prefix}{bronze_table_name}.sql")
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName('My PySpark App') \
+    .getOrCreate()
+
+#Build the code
+config_string = f"{{% snapshot {prefix}{bronze_table_name} %}}"
+config_string += newline + tab_string + "{{"
+config_string += newline + tab_string + tab_string + "config("
+config_string += newline + tab_string + tab_string + tab_string + "strategy='check',"
+config_string += newline + tab_string + tab_string + tab_string + f"unique_key='{column_unique_key}',"
+config_string += newline + tab_string + tab_string + tab_string + "check_cols=["
+
+#This line reads the table column metadata from the Lakehouse.
+columns = spark.catalog.listColumns(f"{bronze_table_name}")
+column_names = [row[0] for row in columns]
+# cleaned_column_names = [[row[0], convert_to_underscore(row[0].lower())] for row in columns]
+cleaned_column_names = [convert_to_underscore(row[0].lower()) for row in columns]
+source_select_column_names = [source_select(row[0].lower()) for row in columns]
+# print(cleaned_column_names)
+config_string += newline + tab_string + tab_string + tab_string + tab_string + "'" + ("'," + newline + tab_string + tab_string + tab_string + tab_string + "'").join(cleaned_column_names)
+config_string += "'],"
+config_string += newline + tab_string + tab_string + tab_string + "hard_deletes='invalidate'"
+config_string += newline + tab_string + tab_string + ")"
+config_string += newline + tab_string + "}}"
+config_string += newline + tab_string + "with source as ("
+config_string += newline + tab_string + tab_string + "select"
+config_string += newline + tab_string + tab_string + tab_string + ("," + newline + tab_string + tab_string + tab_string).join(source_select_column_names)
+config_string += newline + tab_string + tab_string + f"from {{{{ source('mas', '{bronze_table_name}') }}}}"
+
+#Use this line for table with 3 columns in the primary key:
+# config_string += newline + tab_string + tab_string + f"where {partition_by_1} is not null and {partition_by_1} <> '' and {partition_by_2} is not null and {partition_by_2} <> '' and {partition_by_3} is not null and {partition_by_3} <> ''"
+#Use this line for table with 2 columns in the primary key:
+# config_string += newline + tab_string + tab_string + f"where {partition_by_1} is not null and {partition_by_1} <> '' and {partition_by_2} is not null and {partition_by_2} <> ''"
+#Use this line for table with 1 column in the primary key:
+config_string += newline + tab_string + tab_string + f"where {partition_by_1} is not null and {partition_by_1} <> ''"
+
+config_string += newline + tab_string + "),"
+config_string += newline + tab_string + "calc_row_num as ("
+config_string += newline + tab_string + tab_string + "select"
+config_string += newline + tab_string + tab_string + tab_string + "*,"
+
+#Use this line for table with 3 columns in the primary key:
+# config_string += newline + tab_string + tab_string + tab_string + f"row_number() over (partition by {partition_by_1}, {partition_by_2}, {partition_by_3} order by {order_by} desc) as row_num"
+#Use this line for table with 2 columns in the primary key:
+# config_string += newline + tab_string + tab_string + tab_string + f"row_number() over (partition by {partition_by_1}, {partition_by_2} order by {order_by} desc) as row_num"
+#Use this line for table with 1 column in the primary key:
+config_string += newline + tab_string + tab_string + tab_string + f"row_number() over (partition by {partition_by_1} order by {order_by} desc) as row_num"
+
+config_string += newline + tab_string + tab_string + "from source"
+config_string += newline + tab_string + "),"
+config_string += newline + tab_string + "final as ("
+config_string += newline + tab_string + tab_string + "select"
+
+#Use this line for table with 3 columns in the primary key:
+# config_string += newline + tab_string + tab_string + tab_string + f"{{{{ dbt_utils.generate_surrogate_key(['{partition_by_1}', '{partition_by_2}', '{partition_by_3}']) }}}} as {bronze_table_name}{surrogate_key_suffix},"
+#Use this line for table with 2 columns in the primary key:
+# config_string += newline + tab_string + tab_string + tab_string + f"{{{{ dbt_utils.generate_surrogate_key(['{partition_by_1}', '{partition_by_2}']) }}}} as {bronze_table_name}{surrogate_key_suffix},"
+#Use this line for table with 1 column in the primary key:
+config_string += newline + tab_string + tab_string + tab_string + f"{{{{ dbt_utils.generate_surrogate_key(['{partition_by_1}']) }}}} as {bronze_table_name}{surrogate_key_suffix},"
+
+config_string += newline + tab_string + tab_string + tab_string + ("," + newline + tab_string + tab_string + tab_string).join(cleaned_column_names)
+config_string += newline + tab_string + tab_string + "from calc_row_num"
+config_string += newline + tab_string + tab_string + "where row_num = 1"
+config_string += newline + tab_string + tab_string + ")"
+config_string += newline + tab_string + "select *"
+config_string += newline + tab_string + "from final"
+config_string += newline + "{% endsnapshot %}"
+print(config_string)
